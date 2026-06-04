@@ -8,17 +8,11 @@ const authRoutes = require('./routes/auth');
 const driverRoutes = require('./routes/drivers');
 const tripRoutes = require('./routes/trips');
 const adminRoutes = require('./routes/admin');
-const userRoutes = require('./routes/user');
-const subscriptionRoutes = require('./routes/subscription');
-const promoRoutes = require('./routes/promo');
 const wsHandlers = require('./websocket/handlers');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
-
-// Make io accessible to routes
-app.set('io', io);
 
 const db = new Pool({
     user: process.env.DB_USER,
@@ -33,14 +27,10 @@ app.locals.db = db;
 app.use(cors());
 app.use(express.json());
 
-// Routes
-app.use('/api/auth', authRoutes(db));
-app.use('/api/drivers', driverRoutes(db));
-app.use('/api/trips', tripRoutes(db));
-app.use('/api/admin', adminRoutes(db));
-app.use('/api/users', userRoutes(db));
-app.use('/api/subscription', subscriptionRoutes(db));
-app.use('/api/promo', promoRoutes(db));
+app.use('/api/auth', authRoutes);
+app.use('/api/drivers', driverRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/admin', adminRoutes);
 
 // WebSocket authentication
 io.use(async (socket, next) => {
