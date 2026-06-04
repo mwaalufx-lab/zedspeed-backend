@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const driverRoutes = require('./routes/drivers');
 const tripRoutes = require('./routes/trips');
 const adminRoutes = require('./routes/admin');
+const adminAuthRoutes = require('./routes/adminAuth');
 const userRoutes = require('./routes/user');
 const subscriptionRoutes = require('./routes/subscription');
 const promoRoutes = require('./routes/promo');
@@ -41,6 +42,7 @@ app.use('/api/admin', adminRoutes(db));
 app.use('/api/users', userRoutes(db));
 app.use('/api/subscription', subscriptionRoutes(db));
 app.use('/api/promo', promoRoutes(db));
+app.use('/api/admin/auth', adminAuthRoutes(db));
 
 // WebSocket authentication
 io.use(async (socket, next) => {
