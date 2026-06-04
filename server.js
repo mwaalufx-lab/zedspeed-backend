@@ -27,6 +27,7 @@ const db = new Pool({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     database: process.env.DB_NAME,
+    family: 4,          // Force IPv4
 });
 
 app.locals.db = db;
