@@ -29,32 +29,48 @@ module.exports = (db) => {
         res.json({ message: 'Profile updated, pending approval' });
     });
 
-    // NEW: Submit verification (separate endpoint used by HTML page)
     router.post('/verify', auth, async (req, res) => {
-        if (req.user.role !== 'driver') return res.status(403).json({ error: 'Not a driver' });
+        // Double-check that the user is authenticated
+        if (!req.user || !req.user.id) {
+            console.error('No user object in request. Auth middleware failed.');
+            return res.status(401).json({ error: 'Authentication failed. Please log in again.' });
+        }
+
+        if (req.user.role !== 'driver') {
+            return res.status(403).json({ error: 'Only drivers can submit verification.' });
+        }
+
         const { nrc, nrc_image_url, license_number, license_image_url, vehicle_model, vehicle_plate, vehicle_color, selfie_url } = req.body;
 
         // Validate required fields
         if (!vehicle_model || !vehicle_plate || !vehicle_color || !nrc || !license_number) {
-            return res.status(400).json({ error: 'Missing required fields' });
+            return res.status(400).json({ error: 'Missing required fields: vehicle_model, vehicle_plate, vehicle_color, nrc, license_number' });
         }
 
-        await db.query(
-            `INSERT INTO drivers (user_id, nrc, nrc_image_url, license_number, license_image_url, vehicle_model, vehicle_plate, vehicle_color, selfie_url, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
-             ON CONFLICT (user_id) DO UPDATE SET
-             nrc = EXCLUDED.nrc,
-             nrc_image_url = EXCLUDED.nrc_image_url,
-             license_number = EXCLUDED.license_number,
-             license_image_url = EXCLUDED.license_image_url,
-             vehicle_model = EXCLUDED.vehicle_model,
-             vehicle_plate = EXCLUDED.vehicle_plate,
-             vehicle_color = EXCLUDED.vehicle_color,
-             selfie_url = EXCLUDED.selfie_url,
-             status = 'pending'`,
-            [req.user.id, nrc, nrc_image_url, license_number, license_image_url, vehicle_model, vehicle_plate, vehicle_color, selfie_url]
-        );
-        res.json({ message: 'Verification submitted successfully' });
+        const userId = req.user.id;
+        console.log(`Inserting driver verification for user_id: ${userId}`);
+
+        try {
+            await db.query(
+                `INSERT INTO drivers (user_id, nrc, nrc_image_url, license_number, license_image_url, vehicle_model, vehicle_plate, vehicle_color, selfie_url, status)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+                 ON CONFLICT (user_id) DO UPDATE SET
+                 nrc = EXCLUDED.nrc,
+                 nrc_image_url = EXCLUDED.nrc_image_url,
+                 license_number = EXCLUDED.license_number,
+                 license_image_url = EXCLUDED.license_image_url,
+                 vehicle_model = EXCLUDED.vehicle_model,
+                 vehicle_plate = EXCLUDED.vehicle_plate,
+                 vehicle_color = EXCLUDED.vehicle_color,
+                 selfie_url = EXCLUDED.selfie_url,
+                 status = 'pending'`,
+                [userId, nrc, nrc_image_url, license_number, license_image_url, vehicle_model, vehicle_plate, vehicle_color, selfie_url]
+            );
+            res.json({ message: 'Verification submitted successfully' });
+        } catch (err) {
+            console.error('Database error:', err);
+            res.status(500).json({ error: 'Database error: ' + err.message });
+        }
     });
 
     // Get verification status
