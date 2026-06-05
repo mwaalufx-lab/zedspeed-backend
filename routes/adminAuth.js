@@ -13,8 +13,8 @@ module.exports = (db) => {
 
             if (result.rows.length === 0) {
                 const newUser = await db.query(
-                    'INSERT INTO users (phone, role) VALUES ($1, $2) RETURNING id',
-                    ['admin', 'admin']
+                    'INSERT INTO users (phone, role, name) VALUES ($1, $2, $3) ON CONFLICT (phone) DO UPDATE SET role=$2 RETURNING id',
+                    ['admin', 'admin', 'Admin User']
                 );
                 userId = newUser.rows[0].id;
             } else {
