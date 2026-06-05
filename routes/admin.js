@@ -50,5 +50,60 @@ module.exports = (db) => {
         res.json(result.rows);
     });
 
+    // ========== STATS ENDPOINT ==========
+    router.get('/stats', auth, adminOnly, async (req, res) => {
+        try {
+            const [
+                totalDrivers,
+                onlineDrivers,
+                totalPassengers,
+                todayTrips,
+                todayRevenue,
+                pendingDrivers
+            ] = await Promise.all([
+                db.query('SELECT COUNT(*) FROM drivers'),
+                db.query('SELECT COUNT(*) FROM drivers WHERE is_online = true'),
+                db.query('SELECT COUNT(*) FROM users WHERE role = $1', ['passenger']),
+                db.query(`SELECT COUNT(*) FROM trips WHERE DATE(created_at) = CURRENT_DATE`),
+                db.query(`SELECT COALESCE(SUM(fare), 0) FROM trips WHERE DATE(created_at) = CURRENT_DATE AND status = 'completed'`),
+                db.query(`SELECT COUNT(*) FROM drivers WHERE status = 'pending'`)
+            ]);
+            res.json({
+                totalDrivers: parseInt(totalDrivers.rows[0].count),
+                onlineDrivers: parseInt(onlineDrivers.rows[0].count),
+                totalPassengers: parseInt(totalPassengers.rows[0].count),
+                todayTrips: parseInt(todayTrips.rows[0].count),
+                todayRevenue: parseFloat(todayRevenue.rows[0].sum),
+                pendingDrivers: parseInt(pendingDrivers.rows[0].count)
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Failed to fetch stats' });
+        }
+    });
+
+    // ========== LIVE TRIPS ENDPOINT ==========
+    router.get('/trips/live', auth, adminOnly, async (req, res) => {
+        try {
+            const result = await db.query(`
+                SELECT t.*, 
+                       u.name as passenger_name, u.phone as passenger_phone,
+                       du.name as driver_name, dv.vehicle_plate,
+                       t.pickup_lat, t.pickup_lng, t.dest_lat, t.dest_lng
+                FROM trips t
+                JOIN users u ON t.passenger_id = u.id
+                LEFT JOIN drivers d ON t.driver_id = d.user_id
+                LEFT JOIN users du ON d.user_id = du.id
+                LEFT JOIN drivers dv ON d.user_id = dv.user_id
+                WHERE t.status IN ('pending', 'accepted', 'ongoing')
+                ORDER BY t.created_at DESC
+            `);
+            res.json(result.rows);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Failed to fetch live trips' });
+        }
+    });
+
     return router;
 };
