@@ -82,19 +82,43 @@ module.exports = (db) => {
         }
     });
 
+    // Get driver full details (for admin review)
+    router.get('/drivers/:userId/details', auth, adminOnly, async (req, res) => {
+        const { userId } = req.params;
+        try {
+            const result = await db.query(
+                `SELECT u.name, u.phone, u.created_at as user_since,
+                        d.nrc, d.nrc_image_url, d.license_number, d.license_image_url,
+                        d.vehicle_model, d.vehicle_plate, d.vehicle_color, d.selfie_url,
+                        d.status, d.created_at as driver_since
+                 FROM drivers d
+                 JOIN users u ON d.user_id = u.id
+                 WHERE d.user_id = $1`,
+                [userId]
+            );
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Driver not found' });
+            }
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Failed to fetch driver details' });
+        }
+    });
+
     // ========== LIVE TRIPS ENDPOINT ==========
     router.get('/trips/live', auth, adminOnly, async (req, res) => {
         try {
             const result = await db.query(`
-                SELECT t.*, 
+                SELECT t.id, t.pickup_address, t.destination_address,
+                       t.pickup_lat, t.pickup_lng, t.dest_lat, t.dest_lng,
+                       t.fare, t.status, t.created_at,
                        u.name as passenger_name, u.phone as passenger_phone,
-                       du.name as driver_name, dv.vehicle_plate,
-                       t.pickup_lat, t.pickup_lng, t.dest_lat, t.dest_lng
+                       du.name as driver_name, d.vehicle_plate
                 FROM trips t
                 JOIN users u ON t.passenger_id = u.id
                 LEFT JOIN drivers d ON t.driver_id = d.user_id
                 LEFT JOIN users du ON d.user_id = du.id
-                LEFT JOIN drivers dv ON d.user_id = dv.user_id
                 WHERE t.status IN ('pending', 'accepted', 'ongoing')
                 ORDER BY t.created_at DESC
             `);
@@ -102,6 +126,33 @@ module.exports = (db) => {
         } catch (err) {
             console.error(err);
             res.status(500).json({ error: 'Failed to fetch live trips' });
+        }
+    });
+
+    // Admin cancels an ongoing trip (with optional refund)
+    router.post('/trips/:tripId/cancel', auth, adminOnly, async (req, res) => {
+        const { tripId } = req.params;
+        const { reason } = req.body;
+        try {
+            const result = await db.query(
+                `UPDATE trips SET status = 'cancelled_by_admin', cancellation_reason = $1
+                 WHERE id = $2 RETURNING *`,
+                [reason || 'Cancelled by admin', tripId]
+            );
+            if (result.rows.length === 0) {
+                return res.status(404).json({ error: 'Trip not found' });
+            }
+            const io = req.app.get('io');
+            if (io) {
+                io.to(`passenger_${result.rows[0].passenger_id}`).emit('trip_cancelled_by_admin', result.rows[0]);
+                if (result.rows[0].driver_id) {
+                    io.to(`driver_${result.rows[0].driver_id}`).emit('trip_cancelled_by_admin', result.rows[0]);
+                }
+            }
+            res.json({ message: 'Trip cancelled successfully', trip: result.rows[0] });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Failed to cancel trip' });
         }
     });
 
