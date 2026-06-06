@@ -105,5 +105,28 @@ module.exports = (db) => {
         }
     });
 
+    // Get all drivers with filters
+    router.get('/drivers', auth, adminOnly, async (req, res) => {
+        const { status, search } = req.query;
+        let query = `
+            SELECT d.*, u.name, u.phone, u.created_at as user_since
+            FROM drivers d
+            JOIN users u ON d.user_id = u.id
+            WHERE 1=1
+        `;
+        const params = [];
+        if (status && status !== 'all') {
+            params.push(status);
+            query += ` AND d.status = $${params.length}`;
+        }
+        if (search) {
+            params.push(`%${search}%`);
+            query += ` AND (u.name ILIKE $${params.length} OR u.phone ILIKE $${params.length} OR d.vehicle_plate ILIKE $${params.length})`;
+        }
+        query += ` ORDER BY d.created_at DESC`;
+        const result = await db.query(query, params);
+        res.json(result.rows);
+    });
+
     return router;
 };
