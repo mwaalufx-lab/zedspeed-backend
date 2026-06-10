@@ -2,19 +2,32 @@
 const auth = require('../middleware/auth');
 
 module.exports = (db) => {
-    // ========== NEW: REQUEST RIDE ==========
+    // Request a ride (passenger)
     router.post('/request', auth, async (req, res) => {
-        const { pickup_address, destination_address, pickup_lat, pickup_lng, dest_lat, dest_lng, fare, note, booked_for_name, booked_for_phone, additional_stops } = req.body;
-        const result = await db.query(
-            `INSERT INTO trips (passenger_id, pickup_address, destination_address, pickup_lat, pickup_lng, dest_lat, dest_lng, fare, status, passenger_note, booked_for_name, booked_for_phone, additional_stops)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12)
-             RETURNING *`,
-            [req.user.id, pickup_address, destination_address, pickup_lat, pickup_lng, dest_lat, dest_lng, fare, note, booked_for_name, booked_for_phone, JSON.stringify(additional_stops || [])]
-        );
-        // Emit via socket.io to nearby drivers
-        const io = req.app.get('io');
-        if (io) io.emit('new_ride_request', result.rows[0]);
-        res.json(result.rows[0]);
+        try {
+            const {
+                pickup_address, destination_address,
+                pickup_lat, pickup_lng, dest_lat, dest_lng,
+                fare, note, booked_for_name, booked_for_phone, additional_stops
+            } = req.body;
+
+            const result = await db.query(
+                `INSERT INTO trips (passenger_id, pickup_address, destination_address,
+                    pickup_lat, pickup_lng, dest_lat, dest_lng, fare, status,
+                    passenger_note, booked_for_name, booked_for_phone, additional_stops)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10, $11, $12)
+                 RETURNING *`,
+                [req.user.id, pickup_address, destination_address,
+                 pickup_lat, pickup_lng, dest_lat, dest_lng, fare,
+                 note, booked_for_name, booked_for_phone, JSON.stringify(additional_stops || [])]
+            );
+            const io = req.app.get('io');
+            if (io) io.emit('new_ride_request', result.rows[0]);
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Failed to create ride request' });
+        }
     });
 
     // ========== NEW: ACCEPT RIDE (driver) ==========
