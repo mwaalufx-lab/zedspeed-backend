@@ -2,7 +2,7 @@
 const auth = require('../middleware/auth');
 
 module.exports = (db) => {
-    // Request a ride (passenger)
+    // ========== REQUEST A RIDE (passenger) ==========
     router.post('/request', auth, async (req, res) => {
         try {
             const {
