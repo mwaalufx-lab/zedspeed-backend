@@ -95,5 +95,20 @@ module.exports = (db) => {
         res.json({ online });
     });
 
+    // Count approved drivers who are currently online
+    router.get('/online/count', auth, async (req, res) => {
+        try {
+            const result = await db.query(
+                `SELECT COUNT(*) AS count
+                 FROM drivers
+                 WHERE is_online = true AND status = 'approved'`
+            );
+            res.json({ count: parseInt(result.rows[0].count, 10) });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: 'Failed to fetch online drivers count' });
+        }
+    });
+
     return router;
 };
