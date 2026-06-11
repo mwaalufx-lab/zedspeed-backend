@@ -38,7 +38,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes(db));
 app.use('/api/drivers', driverRoutes(db));
-app.use('/api/trips', tripRoutes(db));
+app.use('/api/rides', tripRoutes(db));
 app.use('/api/admin', adminRoutes(db));
 app.use('/api/users', userRoutes(db));
 app.use('/api/subscription', subscriptionRoutes(db));
@@ -72,6 +72,8 @@ io.on('connection', (socket) => {
     }
     wsHandlers(socket, io, db, passengerSockets);
 });
+
+app.get('/api/ping', (req, res) => res.json({ pong: true }));
 
 server.listen(process.env.PORT, () => {
     console.log(`Server running on port ${process.env.PORT}`);
